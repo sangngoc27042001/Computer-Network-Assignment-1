@@ -11,7 +11,8 @@ class ServerWorker:
 	TEARDOWN = 'TEARDOWN'
 	REPLAY='REPLAY'
 	DESCRIBE='DESCRIBE'
-	
+	SPEED='SPEED'
+
 	INIT = 0
 	READY = 1
 	PLAYING = 2
@@ -22,6 +23,8 @@ class ServerWorker:
 	CON_ERR_500 = 2
 	
 	clientInfo = {}
+	speed_array=[1,1.25,1.75,2,4,0.5,0.75]
+	speed_idx=0
 	
 	def __init__(self, clientInfo):
 		self.clientInfo = clientInfo
@@ -125,11 +128,19 @@ class ServerWorker:
 			self.replyRtsp(self.OK_200, seq[1])
 			
 			self.state = self.READY
+		elif requestType== self.SPEED:
+			print("processing SPEED\n")
+			if self.speed_idx==6:
+    				self.speed_idx=0
+			else:
+				self.speed_idx+=1
+			self.replyRtsp(self.OK_200, seq[1])
 			
 	def sendRtp(self):
 		"""Send RTP packets over UDP."""
 		while True:
-			self.clientInfo['event'].wait(0.05) 
+			
+			self.clientInfo['event'].wait(0.05/self.speed_array[self.speed_idx]) 
 			
 			# Stop sending if request is PAUSE or TEARDOWN
 			if self.clientInfo['event'].isSet(): 

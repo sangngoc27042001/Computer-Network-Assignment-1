@@ -20,8 +20,10 @@ class Client:
 	TEARDOWN = 3
 	REPLAY=4
 	DESCRIBE=5
-	
+	SPEED=6
 
+	speed_arr=['Speed: x1','Speed: x1.25','Speed: x1.5','Speed: x2','Speed: x4','Speed: x0.5','Speed: x0.75']
+	speed_idx=0
 	# Initiation..
 	def __init__(self, master, serveraddr, serverport, rtpport, filename):
 		self.master = master
@@ -39,7 +41,6 @@ class Client:
 		self.frameNbr = 0
 		self.current_fps=0
 		self.prev=None #for counting the fps
-		
 	def createWidgets(self):
 		"""Build GUI."""
 		# Create Setup button #lẽ ra là setup
@@ -78,6 +79,12 @@ class Client:
 		self.teardown["command"] =  self.replayMovie
 		self.teardown.grid(row=1, column=4, padx=2, pady=2)
 
+		# Create Speed button
+		self.speed = Button(self.master, width=16, padx=3, pady=3)
+		self.speed["text"] = self.speed_arr[self.speed_idx]
+		self.speed["command"] =  self.speedMovie
+		self.speed.grid(row=2, column=0, padx=2, pady=2)
+
 		# Create a label to display the movie
 		self.label = Label(self.master, height=19)
 		self.label.grid(row=0, column=0, columnspan=5, sticky=W+E+N+S, padx=5, pady=5) 
@@ -114,11 +121,13 @@ class Client:
     		self.sendRtspRequest(self.DESCRIBE)
 
 	def replayMovie(self):
-		self.rtspSeq = 0
 		self.teardownAcked = 0
 		self.frameNbr = 0
 		self.sendRtspRequest(self.REPLAY)
 
+	def speedMovie(self):
+		self.sendRtspRequest(self.SPEED)
+		pass
 	def listenRtp(self):		
 		"""Listen for RTP packets."""
 		while True:
@@ -248,6 +257,11 @@ class Client:
 			request = "DESCRIBE " + str(self.fileName) + " RTSP/1.0\nCSeq: " + str(self.rtspSeq) + "\nSession: " + str(self.sessionId)
 			self.rtspSocket.send(request.encode("utf-8"))
 			self.requestSent = self.DESCRIBE
+		elif requestCode == self.SPEED:
+			self.rtspSeq = self.rtspSeq + 1
+			request = "SPEED " + str(self.fileName) + " RTSP/1.0\nCSeq: " + str(self.rtspSeq) + "\nSession: " + str(self.sessionId)
+			self.rtspSocket.send(request.encode("utf-8"))
+			self.requestSent = self.SPEED
 		else:
 			return
 		
@@ -321,7 +335,13 @@ class Client:
 						self.state = self.READY
 						# The play thread exits. A new thread is created on resume.
 						self.playEvent.set()
-						tkMessageBox.showinfo(title='Information', message=data+'\nFPS: '+str(self.current_fps))
+						tkMessageBox.showinfo(title='Information', message='File name: '+self.fileName+'\n'+data.split('\n')[2]+'\nFPS: '+str(self.current_fps))
+					elif self.requestSent == self.SPEED:
+						if self.speed_idx==6:
+							self.speed_idx=0
+						else:
+							self.speed_idx+=1
+						self.speed["text"] = self.speed_arr[self.speed_idx]
 	
 	def openRtpPort(self):
 		"""Open RTP socket binded to a specified port."""
