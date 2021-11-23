@@ -4,10 +4,11 @@ from PIL import Image, ImageTk,ImageDraw ,ImageFont
 import socket, threading, sys, traceback, os
 from time import time
 from RtpPacket import RtpPacket
+import sys
 
 CACHE_FILE_NAME = "cache-"
 CACHE_FILE_EXT = ".jpg"
-
+a=0
 class Client:
 	INIT = 0
 	READY = 1
@@ -30,8 +31,8 @@ class Client:
 		self.master.protocol("WM_DELETE_WINDOW", self.handler)
 		self.createWidgets()
 		self.serverAddr = serveraddr
-		self.serverPort = int(serverport)
-		self.rtpPort = int(rtpport)
+		self.serverPort = serverport
+		self.rtpPort = rtpport
 		self.fileName = filename
 		self.rtspSeq = 0
 		self.sessionId = 0
@@ -40,7 +41,10 @@ class Client:
 		self.connectToServer()
 		self.frameNbr = 0
 		self.current_fps=0
-		self.prev=None #for counting the fps
+		self.prev_fps=None #for counting the fps
+
+		self.video_current_data_rate=0
+		self.prev_datarate=None 
 	def createWidgets(self):
 		"""Build GUI."""
 		# Create Setup button #lẽ ra là setup
@@ -138,7 +142,13 @@ class Client:
 					rtpPacket.decode(data)
 					
 					currFrameNbr = rtpPacket.seqNum()
-					print("Current Seq Num: " + str(currFrameNbr))
+					
+					if self.prev_datarate==None:
+						self.prev_datarate=time()
+
+					self.video_current_data_rate=int(sys.getsizeof(rtpPacket.getPayload())/(time()-self.prev_datarate)/1000)
+					print("Current Seq Num: " + str(currFrameNbr)+' '+str(self.video_current_data_rate))
+					self.prev_datarate=time()
 										
 					if currFrameNbr > self.frameNbr: # Discard the late packet
 						self.frameNbr = currFrameNbr
@@ -167,11 +177,11 @@ class Client:
 	def updateMovie(self, imageFile):
 		"""Update the image file as video frame in the GUI."""
 		self.current_fps=0
-		if self.prev == None:
-    			self.prev=time()
+		if self.prev_fps == None:
+    			self.prev_fps=time()
 		else:
-				self.current_fps=round(1/(time()-self.prev),2)
-				self.prev=time()
+				self.current_fps=round(1/(time()-self.prev_fps),2)
+				self.prev_fps=time()
 		img=Image.open(imageFile)
 		draw = ImageDraw.Draw(img)
 		draw.text((5, 5),"fps: "+str(self.current_fps),(255,255,255))
@@ -247,17 +257,17 @@ class Client:
 			# Keep track of the sent request.
 			# self.requestSent = ...
 			self.requestSent = self.TEARDOWN
-		elif requestCode == self.REPLAY:
+		elif requestCode == self.REPLAY and not self.state == self.INIT:
 			self.rtspSeq = self.rtspSeq + 1
 			request = "REPLAY " + str(self.fileName) + " RTSP/1.0\nCSeq: " + str(self.rtspSeq) + "\nSession: " + str(self.sessionId)
 			self.rtspSocket.send(request.encode("utf-8"))
 			self.requestSent = self.REPLAY
-		elif requestCode == self.DESCRIBE:
+		elif requestCode == self.DESCRIBE and not self.state == self.INIT:
 			self.rtspSeq = self.rtspSeq + 1
 			request = "DESCRIBE " + str(self.fileName) + " RTSP/1.0\nCSeq: " + str(self.rtspSeq) + "\nSession: " + str(self.sessionId)
 			self.rtspSocket.send(request.encode("utf-8"))
 			self.requestSent = self.DESCRIBE
-		elif requestCode == self.SPEED:
+		elif requestCode == self.SPEED and not self.state == self.INIT:
 			self.rtspSeq = self.rtspSeq + 1
 			request = "SPEED " + str(self.fileName) + " RTSP/1.0\nCSeq: " + str(self.rtspSeq) + "\nSession: " + str(self.sessionId)
 			self.rtspSocket.send(request.encode("utf-8"))
@@ -335,7 +345,7 @@ class Client:
 						self.state = self.READY
 						# The play thread exits. A new thread is created on resume.
 						self.playEvent.set()
-						tkMessageBox.showinfo(title='Information', message='File name: '+self.fileName+'\n'+data.split('\n')[2]+'\nFPS: '+str(self.current_fps))
+						tkMessageBox.showinfo(title='Information', message='File name: '+self.fileName+'\n'+data.split('\n')[2]+'\nFPS: '+str(self.current_fps)+'\nVideo Data Rate: '+str(self.video_current_data_rate)+' kBytes')
 					elif self.requestSent == self.SPEED:
 						if self.speed_idx==6:
 							self.speed_idx=0
