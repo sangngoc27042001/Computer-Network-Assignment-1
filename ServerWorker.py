@@ -59,6 +59,9 @@ class ServerWorker:
 				# Update state
 				print("processing SETUP\n")
 				
+				# Create a new socket for RTP/UDP
+				self.clientInfo["rtpSocket"] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 				try:
 					self.clientInfo['videoStream'] = VideoStream(filename)
 					self.state = self.READY
@@ -80,8 +83,7 @@ class ServerWorker:
 				print("processing PLAY\n")
 				self.state = self.PLAYING
 				
-				# Create a new socket for RTP/UDP
-				self.clientInfo["rtpSocket"] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+				
 				
 				self.replyRtsp(self.OK_200, seq[1])
 				
